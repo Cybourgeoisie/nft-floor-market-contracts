@@ -1,4 +1,4 @@
-# NFT Floor Market
+# NFT Floor Market Contracts
 
 ETH <-> NFT swap service that lets buyers place floor offers for any NFT within a collection. Anyone can take up the offer by selling their NFT for the highest ETH bid.
 

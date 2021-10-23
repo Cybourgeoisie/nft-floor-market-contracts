@@ -3,8 +3,9 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract NFTFloorMarket is ReentrancyGuard {
+contract NFTFloorMarket is ReentrancyGuard, Ownable {
 
     // Events
     event OfferPlaced(
@@ -53,6 +54,11 @@ contract NFTFloorMarket is ReentrancyGuard {
     mapping(address => uint256[]) offersByOfferer;
 
 
+    // Market Fees
+    uint256 MARKET_FEE_DIVIDEND = 200; // Comes out to 0.5%
+    uint256 heldMarketFees = 0;
+
+
     /**
      * Make an offer on any NFT within a contract
      **/
@@ -92,7 +98,7 @@ contract NFTFloorMarket is ReentrancyGuard {
         nonReentrant
     {
         // Make sure the offer ID exists
-        require(_offerId <= lastOfferId, "Offer ID does not exist");
+        require(_offerId <= lastOfferId, "Offer does not exist");
 
         // Get the offer
         Offer memory _offer = offers[_offerId];
@@ -125,7 +131,7 @@ contract NFTFloorMarket is ReentrancyGuard {
         Offer memory _offer = offers[_offerId];
 
         // Make sure the offer exists
-        require(_offer._contract != address(0) && _offer._offerer != address(0) && _offer._value != 0, "Offer ID does not exist");
+        require(_offer._contract != address(0) && _offer._offerer != address(0) && _offer._value != 0, "Offer does not exist");
 
         // Require that the seller owns the token
         require(IERC721(_offer._contract).ownerOf(_tokenId) == msg.sender, "Not owner of token");
@@ -142,11 +148,28 @@ contract NFTFloorMarket is ReentrancyGuard {
         // Transfer NFT to the buyer
         IERC721(_offer._contract).safeTransferFrom(msg.sender, _offer._offerer, _tokenId);
 
+        // Split the value among royalties (need to implement EIP here), seller, and market
+        uint256 marketFee = _offer._value / MARKET_FEE_DIVIDEND;
+        uint256 sellerValue = _offer._value - marketFee;
+
         // Send the value to the seller
-        payable(msg.sender).transfer(_offer._value);
+        payable(msg.sender).transfer(sellerValue);
+
+        // Keep track of amount market earned
+        heldMarketFees += marketFee;
 
         // Announce offer accepted
         emit OfferAccepted(_offerId, _offer._contract, _offer._offerer, msg.sender, _offer._value);
+    }
+
+
+    function withdrawMarketFees()
+        public
+        onlyOwner
+        nonReentrant
+    {
+        payable(owner()).transfer(heldMarketFees);
+        heldMarketFees = 0;
     }
 
 
