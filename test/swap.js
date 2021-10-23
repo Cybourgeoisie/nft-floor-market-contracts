@@ -54,6 +54,13 @@ describe('NFT Floor Market Tests', function () {
       expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("1.0"));
     });
 
+    it('Expected reverts on withdrawOffer', async function () {
+      expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("1.0"));
+      await expectRevert(marketContract.connect(takers[0]).withdrawOffer(1), 'Offer does not exist');
+      await expectRevert(marketContract.connect(takers[0]).withdrawOffer(0), 'Sender does not own offer');
+      expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("1.0"));
+    });
+
     it('Withdraw an offer on contract #0', async function () {
       expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("1.0"));
       await marketContract.connect(makers[0]).withdrawOffer(0);

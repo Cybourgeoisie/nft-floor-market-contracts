@@ -45,13 +45,13 @@ contract NFTFloorMarket is ReentrancyGuard, Ownable {
     uint256 public lastOfferId = 0;
 
     // Keep track of all offers
-    mapping(uint256 => Offer) offers;
+    mapping(uint256 => Offer) public offers;
 
     // Keep track of offer IDs per contract
-    mapping(address => uint256[]) offersByContract;
+    mapping(address => uint256[]) public offersByContract;
 
     // Keep track of offer per offerer address
-    mapping(address => uint256[]) offersByOfferer;
+    mapping(address => uint256[]) public offersByOfferer;
 
 
     // Market Fees
@@ -69,6 +69,9 @@ contract NFTFloorMarket is ReentrancyGuard, Ownable {
         payable
         nonReentrant
     {
+        // Require that the contract is a valid ERC721 token
+        require(IERC721(_contract).supportsInterface(0x80ac58cd), "Not a valid ERC-721 Contract");
+
         // Store the records
         offers[lastOfferId] = Offer(
             _contract,
@@ -97,11 +100,11 @@ contract NFTFloorMarket is ReentrancyGuard, Ownable {
         public
         nonReentrant
     {
-        // Make sure the offer ID exists
-        require(_offerId <= lastOfferId, "Offer does not exist");
-
         // Get the offer
         Offer memory _offer = offers[_offerId];
+
+        // Make sure the offer exists
+        require(_offer._contract != address(0) && _offer._offerer != address(0) && _offer._value != 0, "Offer does not exist");
 
         // Make sure that the sender is the owner of the offer ID
         require(_offer._offerer == msg.sender, "Sender does not own offer");
