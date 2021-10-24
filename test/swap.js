@@ -11,10 +11,26 @@ const {
 
 describe('NFT Floor Market Tests', function () {
   let nftContracts = [], marketContract;
-  let owner, takers = [], makers = [];
+  let owner, takers = [], makers = [], getterTestMakers;
 
   before(async () => {
     [owner, takers[0], takers[1], takers[2], ...makers] = await ethers.getSigners();
+
+    // For later tests
+    getterTestMakers = [
+      [makers[2], ethers.utils.parseEther("1.25") ],
+      [makers[3], ethers.utils.parseEther("2.5")  ],
+      [makers[4], ethers.utils.parseEther("3.75") ],
+      [makers[0], ethers.utils.parseEther("5.0")  ],
+      [makers[1], ethers.utils.parseEther("6.25") ],
+      [makers[2], ethers.utils.parseEther("7.5")  ],
+      [makers[3], ethers.utils.parseEther("8.75") ],
+      [makers[4], ethers.utils.parseEther("10.0") ],
+      [makers[5], ethers.utils.parseEther("11.25")],
+      [makers[0], ethers.utils.parseEther("12.5") ],
+      [makers[1], ethers.utils.parseEther("13.75")],
+      [makers[2], ethers.utils.parseEther("15.0") ]
+    ]
 
     const NFTContract = await ethers.getContractFactory('ERC721NFT');
     nftContracts = [
@@ -28,6 +44,8 @@ describe('NFT Floor Market Tests', function () {
     await nftContracts[1].connect(owner).mint(takers[1].address, 0);
     await nftContracts[1].connect(owner).mint(takers[1].address, 1);
 
+    await nftContracts[2].connect(owner).mint(takers[2].address, 0);
+    await nftContracts[2].connect(owner).mint(takers[2].address, 1);
     await nftContracts[2].connect(owner).mint(takers[2].address, 2);
 
     const NFTFloorMarket = await ethers.getContractFactory('NFTFloorMarket');
@@ -130,6 +148,142 @@ describe('NFT Floor Market Tests', function () {
       // Shouldn't withdraw anything more
       await marketContract.connect(owner).withdrawMarketFees();
       expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(0);
+    });
+
+  });
+
+
+  describe('Getters', function () {
+    it('Make multiple offers on #2', async function () {
+      expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(0);
+      for (let idx = 0; idx < getterTestMakers.length; idx++) {
+        await marketContract.connect(getterTestMakers[idx][0]).makeOffer(nftContracts[2].address, {value : getterTestMakers[idx][1]});
+      }
+      expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("97.5"));
+    });
+
+    async function reviewOffersByContract(_debug = false) {
+      // Get the number of offers
+      let length = await marketContract.getOffersByContractCount(nftContracts[2].address);
+      expect(length).to.be.eq(getterTestMakers.length);
+
+      let limitSize = 5;
+      for (let offsetIdx = 0; offsetIdx < length; offsetIdx+=limitSize) {
+        let res = await marketContract.getOffersByContract(nftContracts[2].address, limitSize, Math.ceil(offsetIdx / limitSize));
+
+        expect(res.length).to.be.eq(limitSize);
+
+        for (let idx = 0; idx < res.length && res[idx]._value.toString() != 0; idx++) {
+          expect(res[idx]._contract).to.be.eq(nftContracts[2].address);
+          expect(res[idx]._offerer).to.be.eq(getterTestMakers[offsetIdx + idx][0].address);
+          expect(res[idx]._value).to.be.eq(getterTestMakers[offsetIdx + idx][1]);
+        }
+      }
+    }
+
+    async function reviewOffersByOfferer(_debug = false) {
+      // Compile the list of makers & relative counts
+      let localMakers = {};
+      for (let set of getterTestMakers) {
+        if (!localMakers.hasOwnProperty(set[0].address)) {
+          localMakers[set[0].address] = [];
+        }
+
+        localMakers[set[0].address].push(set[1]);
+      }
+
+      // For each of the various offerers...
+      for (let makerAddress in localMakers) {
+        // Get the number of offers
+        let length = await marketContract.getOffersByOffererCount(makerAddress);
+        expect(length).to.be.eq(localMakers[makerAddress].length);
+
+        let limitSize = 2;
+        for (let offsetIdx = 0; offsetIdx < length; offsetIdx+=limitSize) {
+          let res = await marketContract.getOffersByOfferer(makerAddress, limitSize, Math.ceil(offsetIdx / limitSize));
+
+          expect(res.length).to.be.eq(limitSize);
+
+          for (let idx = 0; idx < res.length && res[idx]._value.toString() != 0; idx++) {
+            let matchFound = false;
+            for (let value of localMakers[makerAddress]) {
+              if (
+                res[idx]._contract === nftContracts[2].address &&
+                res[idx]._offerer === makerAddress &&
+                res[idx]._value.toString() === value.toString()
+              ) {
+                matchFound = true;
+              }
+            }
+            expect(matchFound).to.be.eq(true);
+          }
+        }
+      }
+    }
+
+    it('Get offers by contract', reviewOffersByContract);
+
+    it('Get offers by offerer', reviewOffersByOfferer);
+
+    it('Pluck out an offer from the middle of contract #2', async function () {
+      expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("97.5"));
+
+      await nftContracts[2].connect(takers[2]).approve(marketContract.address, 0);
+      await marketContract.connect(takers[2]).takeOffer(9, 0); // (_offerId, _tokenId)
+
+      // Remove the associated getterTestMakers row
+      getterTestMakers[5] = getterTestMakers[getterTestMakers.length - 1];
+      getterTestMakers.pop();
+
+      expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("90.0375"));
+    });
+
+    it('Get offers by contract', reviewOffersByContract);
+
+    it('Get offers by offerer', reviewOffersByOfferer);
+
+    it('Pluck out another offer from near the end of contract #2', async function () {
+      expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("90.0375"));
+
+      await nftContracts[2].connect(takers[2]).approve(marketContract.address, 2);
+      await marketContract.connect(takers[2]).takeOffer(13, 2); // (_offerId, _tokenId)
+
+      // Remove the associated getterTestMakers row
+      getterTestMakers[9] = getterTestMakers[getterTestMakers.length - 1];
+      getterTestMakers.pop();
+
+      expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("77.6"));
+    });
+
+    it('Get offers by contract', reviewOffersByContract);
+
+    it('Get offers by offerer', reviewOffersByOfferer);
+
+    it('Pluck out another offer from near the beginning of contract #2', async function () {
+      expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("77.6"));
+
+      await nftContracts[2].connect(takers[2]).approve(marketContract.address, 1);
+      await marketContract.connect(takers[2]).takeOffer(5, 1); // (_offerId, _tokenId)
+
+      // Remove the associated getterTestMakers row
+      getterTestMakers[1] = getterTestMakers[getterTestMakers.length - 1];
+      getterTestMakers.pop();
+
+      expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("75.1125"));
+    });
+
+    it('Get offers by contract', reviewOffersByContract);
+
+    it('Get offers by offerer', reviewOffersByOfferer.bind(this, true));
+
+    it('Withdraw market fees', async function () {
+      expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("75.1125"));
+      await marketContract.connect(owner).withdrawMarketFees();
+      expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("75.0"));
+
+      // Shouldn't withdraw anything more
+      await marketContract.connect(owner).withdrawMarketFees();
+      expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("75.0"));
     });
 
   });

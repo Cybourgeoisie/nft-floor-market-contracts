@@ -27,6 +27,7 @@ contract NFTFloorMarket is ReentrancyGuard, Ownable {
         address indexed _contract,
         address _offerer,
         address _seller,
+        uint256 _tokenId,
         uint256 _value
     );
 
@@ -36,8 +37,8 @@ contract NFTFloorMarket is ReentrancyGuard, Ownable {
         address _contract;
         address _offerer;
         uint256 _value;
-        uint256 _contractListIndex;
-        uint256 _offererListIndex;
+        uint128 _contractListIndex; // This and the following are 128 to make use of bitpacking on the struct
+        uint128 _offererListIndex;
     }
 
 
@@ -48,14 +49,14 @@ contract NFTFloorMarket is ReentrancyGuard, Ownable {
     mapping(uint256 => Offer) public offers;
 
     // Keep track of offer IDs per contract
-    mapping(address => uint256[]) public offersByContract;
+    mapping(address => uint128[]) public offersByContract;
 
     // Keep track of offer per offerer address
-    mapping(address => uint256[]) public offersByOfferer;
+    mapping(address => uint128[]) public offersByOfferer;
 
 
     // Market Fees
-    uint256 MARKET_FEE_DIVIDEND = 200; // Comes out to 0.5%
+    uint8   MARKET_FEE_DIVIDEND = 200; // Comes out to 0.5%
     uint256 heldMarketFees = 0;
 
 
@@ -77,11 +78,11 @@ contract NFTFloorMarket is ReentrancyGuard, Ownable {
             _contract,
             msg.sender,
             msg.value,
-            offersByContract[_contract].length,
-            offersByOfferer[msg.sender].length
+            uint128(offersByContract[_contract].length),
+            uint128(offersByOfferer[msg.sender].length)
         );
-        offersByContract[_contract].push(lastOfferId);
-        offersByOfferer[msg.sender].push(lastOfferId);
+        offersByContract[_contract].push(uint128(lastOfferId));
+        offersByOfferer[msg.sender].push(uint128(lastOfferId));
 
         // On to the next offer ID
         lastOfferId += 1;
@@ -162,10 +163,13 @@ contract NFTFloorMarket is ReentrancyGuard, Ownable {
         heldMarketFees += marketFee;
 
         // Announce offer accepted
-        emit OfferAccepted(_offerId, _offer._contract, _offer._offerer, msg.sender, _offer._value);
+        emit OfferAccepted(_offerId, _offer._contract, _offer._offerer, msg.sender, _tokenId, _offer._value);
     }
 
 
+    /**
+     * Withdraw ETH from the Market
+     **/
     function withdrawMarketFees()
         public
         onlyOwner
@@ -177,9 +181,84 @@ contract NFTFloorMarket is ReentrancyGuard, Ownable {
 
 
     /**
+     * Getters
+     **/
+    function getOffersByContractCount(
+        address _contract
+    )
+        public
+        view
+        returns (uint256 _length)
+    {
+        return offersByContract[_contract].length;
+    }
+
+    function getOffersByContract(
+        address _contract,
+        uint256 _limit,
+        uint256 _offset
+    )
+        public
+        view
+        returns (Offer[] memory _offers)
+    {
+        // Limits & Offers
+        if (_limit == 0) {
+            _limit = 1;
+        }
+
+        // Keep track of all offers
+        _offers = new Offer[](_limit);
+
+        // Iterate through offers by contract
+        uint256 offerIdx;
+        for (uint256 idx = _offset * _limit; idx < offersByContract[_contract].length && offerIdx < _limit; idx++) {
+            _offers[offerIdx++] = offers[offersByContract[_contract][idx]];
+        }
+
+        return _offers;
+    }
+
+    function getOffersByOffererCount(
+        address _offerer
+    )
+        public
+        view
+        returns (uint256 _length)
+    {
+        return offersByOfferer[_offerer].length;
+    }
+
+    function getOffersByOfferer(
+        address _offerer,
+        uint256 _limit,
+        uint256 _offset
+    )
+        public
+        view
+        returns (Offer[] memory _offers)
+    {
+        // Limits & Offers
+        if (_limit == 0) {
+            _limit = 1;
+        }
+
+        // Keep track of all offers
+        _offers = new Offer[](_limit);
+
+        // Iterate through offers by contract
+        uint256 offerIdx;
+        for (uint256 idx = _offset * _limit; idx < offersByOfferer[_offerer].length && offerIdx < _limit; idx++) {
+            _offers[offerIdx++] = offers[offersByOfferer[_offerer][idx]];
+        }
+
+        return _offers;
+    }
+
+
+    /**
      * Internal Helper Functions 
      **/
-
     function _removeOffer(Offer memory _offer, uint256 _offerId) private {
         // Find and remove from the contract list and offerer list
         _removeFromContractList(_offer._contract, _offer._contractListIndex);
@@ -190,13 +269,13 @@ contract NFTFloorMarket is ReentrancyGuard, Ownable {
     }
 
 
-    function _removeFromContractList(address _contract, uint256 index) private {
+    function _removeFromContractList(address _contract, uint128 index) private {
         uint256 _length = offersByContract[_contract].length;
 
         // If this index is less than the last element, then replace this element with the last element
         if (index < _length - 1) {
             // Get the last offer ID in the list
-            uint256 otherOfferId = offersByContract[_contract][_length - 1];
+            uint128 otherOfferId = offersByContract[_contract][_length - 1];
 
             // Replace with the last element
             offersByContract[_contract][index] = otherOfferId;
@@ -209,13 +288,13 @@ contract NFTFloorMarket is ReentrancyGuard, Ownable {
         offersByContract[_contract].pop();
     }
 
-    function _removeFromOffererList(address offerer, uint256 index) private {
+    function _removeFromOffererList(address offerer, uint128 index) private {
         uint256 _length = offersByOfferer[offerer].length;
 
         // If this index is less than the last element, then replace this element with the last element
         if (index < _length - 1) {
             // Get the last offer ID in the list
-            uint256 otherOfferId = offersByOfferer[offerer][_length - 1];
+            uint128 otherOfferId = offersByOfferer[offerer][_length - 1];
 
             // Replace with the last element
             offersByOfferer[offerer][index] = otherOfferId;
