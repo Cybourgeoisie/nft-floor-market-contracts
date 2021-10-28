@@ -41,6 +41,14 @@ contract NFTFloorMarket is ReentrancyGuard, Ownable {
         uint128 _offererListIndex;
     }
 
+    // Offer Details Structure
+    struct OfferDetails {
+        uint256 _offerId;
+        address _contract;
+        address _offerer;
+        uint256 _value;
+    }
+
 
     // Keep track of latest offer ID
     uint256 public lastOfferId = 0;
@@ -60,6 +68,9 @@ contract NFTFloorMarket is ReentrancyGuard, Ownable {
     uint256 heldMarketFees = 0;
 
 
+    // Anti-Griefing
+    uint256 MINIMUM_BUY_ORDER = 10000000000000000; // 0.01 ETH
+
     /**
      * Make an offer on any NFT within a contract
      **/
@@ -72,6 +83,7 @@ contract NFTFloorMarket is ReentrancyGuard, Ownable {
     {
         // Require that the contract is a valid ERC721 token
         require(IERC721(_contract).supportsInterface(0x80ac58cd), "Not a valid ERC-721 Contract");
+        require(msg.value >= MINIMUM_BUY_ORDER, "Buy order too low");
 
         // Store the records
         offers[lastOfferId] = Offer(
@@ -200,7 +212,7 @@ contract NFTFloorMarket is ReentrancyGuard, Ownable {
     )
         public
         view
-        returns (Offer[] memory _offers)
+        returns (OfferDetails[] memory _offers)
     {
         // Limits & Offers
         if (_limit == 0) {
@@ -208,12 +220,17 @@ contract NFTFloorMarket is ReentrancyGuard, Ownable {
         }
 
         // Keep track of all offers
-        _offers = new Offer[](_limit);
+        _offers = new OfferDetails[](_limit);
 
         // Iterate through offers by contract
         uint256 offerIdx;
         for (uint256 idx = _offset * _limit; idx < offersByContract[_contract].length && offerIdx < _limit; idx++) {
-            _offers[offerIdx++] = offers[offersByContract[_contract][idx]];
+            _offers[offerIdx++] = OfferDetails(
+                offersByContract[_contract][idx],
+                offers[offersByContract[_contract][idx]]._contract,
+                offers[offersByContract[_contract][idx]]._offerer,
+                offers[offersByContract[_contract][idx]]._value
+            );
         }
 
         return _offers;
@@ -236,7 +253,7 @@ contract NFTFloorMarket is ReentrancyGuard, Ownable {
     )
         public
         view
-        returns (Offer[] memory _offers)
+        returns (OfferDetails[] memory _offers)
     {
         // Limits & Offers
         if (_limit == 0) {
@@ -244,12 +261,17 @@ contract NFTFloorMarket is ReentrancyGuard, Ownable {
         }
 
         // Keep track of all offers
-        _offers = new Offer[](_limit);
+        _offers = new OfferDetails[](_limit);
 
         // Iterate through offers by contract
         uint256 offerIdx;
         for (uint256 idx = _offset * _limit; idx < offersByOfferer[_offerer].length && offerIdx < _limit; idx++) {
-            _offers[offerIdx++] = offers[offersByOfferer[_offerer][idx]];
+            _offers[offerIdx++] = OfferDetails(
+                offersByOfferer[_offerer][idx],
+                offers[offersByOfferer[_offerer][idx]]._contract,
+                offers[offersByOfferer[_offerer][idx]]._offerer,
+                offers[offersByOfferer[_offerer][idx]]._value
+            );
         }
 
         return _offers;

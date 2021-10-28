@@ -4,10 +4,11 @@
 	"description": "",
 	"main": "index.js",
 	"scripts": {
-		"chain": "hardhat node",
+		"chain": "hardhat node --network hardhat",
 		"fork": "hardhat node --network hardhat",
 		"compile": "hardhat compile",
-		"deploy": "hardhat run ./scripts/deploy-contract.js",
+		"deploy": "hardhat run ./scripts/deploy.js --network hardhat",
+		"deploy-tests": "hardhat run ./scripts/deploy-tests.js --network localhost",
 		"test": "hardhat test --network hardhat"
 	},
 	"author": "Ben Heidorn",
