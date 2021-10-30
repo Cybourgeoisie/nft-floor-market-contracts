@@ -20,7 +20,7 @@ module.exports = {
       }
     }
   },
-  //defaultNetwork: 'localhost',
+  defaultNetwork: 'localhost',
   networks: {
     hardhat: {
       forking: {

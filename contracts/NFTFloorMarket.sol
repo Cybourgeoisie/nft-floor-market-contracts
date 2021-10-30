@@ -65,25 +65,43 @@ contract NFTFloorMarket is ReentrancyGuard, Ownable {
 
 
     // Royalty Fee Address
-    address MANIFOLD_ROYALTY_ENGINE;
+    address public MANIFOLD_ROYALTY_ENGINE;
 
 
     // Market Fees
-    uint8   MARKET_FEE_DIVIDEND = 200; // Comes out to 0.5%
-    uint256 heldMarketFees = 0;
+    uint8   public MARKET_FEE_DIVIDEND = 200; // Comes out to 0.5%
+    address public marketFeeAddress;
 
 
     // Anti-Griefing
-    uint256 MINIMUM_BUY_ORDER = 10000000000000000; // 0.01 ETH
+    uint256 public MINIMUM_BUY_OFFER = 10000000000000000; // 0.01 ETH
 
 
     /**
-     * Royalties
+     * Royalties - lookup for all royalty addresses
      **/
     function setRoyaltyRegistryAddress(address _addr) public onlyOwner {
         MANIFOLD_ROYALTY_ENGINE = _addr;
     }
 
+    /**
+     * Market Fee Address - all market fees get sent here
+     **/
+    function setMarketFeeAddress(address _addr) public onlyOwner {
+        marketFeeAddress = _addr;
+    }
+
+    /**
+     * Set the minimum buy order amount - anti-griefing mechanic
+     **/
+    function setMinimumBuyOffer(uint256 _minValue) public onlyOwner {
+        MINIMUM_BUY_OFFER = _minValue;
+    }
+
+
+    /**
+     * Wrapper to get all royalties for a given contract + tokenId at a given value
+     **/
     function getRoyalties(
         address _contract,
         uint256 _tokenId,
@@ -116,7 +134,7 @@ contract NFTFloorMarket is ReentrancyGuard, Ownable {
     {
         // Require that the contract is a valid ERC721 token
         require(IERC721(_contract).supportsInterface(0x80ac58cd), "Not a valid ERC-721 Contract");
-        require(msg.value >= MINIMUM_BUY_ORDER, "Buy order too low");
+        require(msg.value >= MINIMUM_BUY_OFFER, "Buy order too low");
 
         // Store the records
         offers[lastOfferId] = Offer(
@@ -149,12 +167,6 @@ contract NFTFloorMarket is ReentrancyGuard, Ownable {
         // Get the offer
         Offer memory _offer = offers[_offerId];
 
-        /*
-        // Unneeded since second check validates that the offer is legitimate
-        // Make sure the offer exists
-        require(_offer._contract != address(0), "Offer does not exist");
-        */
-
         // Make sure that the sender is the owner of the offer ID
         require(_offer._offerer == msg.sender, "Sender does not own offer");
 
@@ -185,19 +197,6 @@ contract NFTFloorMarket is ReentrancyGuard, Ownable {
         // Make sure the offer exists
         require(_offer._contract != address(0), "Offer does not exist");
 
-        /*
-        // The following two are unnecessary, as transfer fails without it
-
-        // Require that the seller owns the token
-        require(IERC721(_offer._contract).ownerOf(_tokenId) == msg.sender, "Not owner of token");
-
-        // Require that the contract can transfer the token
-        require(
-            IERC721(_offer._contract).isApprovedForAll(msg.sender, address(this)) || IERC721(_offer._contract).getApproved(_tokenId) == address(this),
-            "Allowance not granted"
-        );
-        */
-
         // Remove the offer
         _removeOffer(_offer, _offerId);
 
@@ -214,32 +213,27 @@ contract NFTFloorMarket is ReentrancyGuard, Ownable {
             }
         }
 
-        // Split the value among royalties (need to implement EIP here), seller, and market
+        // Get the market fee
         uint256 marketFee = _offer._value / MARKET_FEE_DIVIDEND;
-        uint256 sellerValue = _offer._value - marketFee - totalRoyaltyFee;
+
+        // Split the value among royalties, seller, and market
+        uint256 sellerValue;
+        if (_offer._value < (marketFee + totalRoyaltyFee)) {
+            // In the exceptionally strange case where value < market fee + royalty fee, leave out the market fee since royalty fees
+            //  need to be less than or equal to provided value (per external contract logic)
+            sellerValue = _offer._value - totalRoyaltyFee;
+        } else {
+            sellerValue = _offer._value - marketFee - totalRoyaltyFee;
+        }
 
         // Send the value to the seller
         msg.sender.call{value: sellerValue}('');
 
         // Keep track of amount market earned
-        heldMarketFees += marketFee;
+        marketFeeAddress.call{value: marketFee}('');
 
         // Announce offer accepted
         emit OfferAccepted(_offerId, _offer._contract, _offer._offerer, msg.sender, _tokenId, _offer._value);
-    }
-
-
-    /**
-     * Withdraw ETH from the Market
-     **/
-    function withdrawMarketFees()
-        public
-        onlyOwner
-        nonReentrant
-    {
-        uint256 _heldMarketFees = heldMarketFees;
-        heldMarketFees = 0;
-        payable(owner()).transfer(_heldMarketFees);
     }
 
 

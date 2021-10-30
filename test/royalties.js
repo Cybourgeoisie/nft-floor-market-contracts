@@ -42,6 +42,7 @@ const IMPERSONATED = {};
 describe('NFT Floor Market Royalty Payment Tests on Ethereum', function () {
   let marketContract;
   let owner, accts = [];
+  let marketFeeAddress = '0x85c560610A3c8ACccAD214A6BAaefCdDC81aDDA8';
 
   before(async () => {
     // impersonate accounts holding shells
@@ -65,6 +66,7 @@ describe('NFT Floor Market Royalty Payment Tests on Ethereum', function () {
     const NFTFloorMarket = await ethers.getContractFactory('NFTFloorMarket');
     marketContract = await NFTFloorMarket.deploy();
     await marketContract.setRoyaltyRegistryAddress('0x0385603ab55642cb4dd5de3ae9e306809991804f');
+    await marketContract.setMarketFeeAddress(marketFeeAddress);
   });
 
 
@@ -167,38 +169,40 @@ describe('NFT Floor Market Royalty Payment Tests on Ethereum', function () {
       expect(await ethers.provider.getBalance(TO_IMPERSONATE['cybourgeoisie'].address)).to.be.eq(ethers.utils.parseEther("101.950016835087156937"));
       await nftContracts['bayc'].connect(IMPERSONATED['cybourgeoisie']).approve(marketContract.address, 10);
       await marketContract.connect(IMPERSONATED['cybourgeoisie']).takeOffer(1, 10); // (_offerId, _tokenId)
-      expect(await ethers.provider.getBalance(TO_IMPERSONATE['cybourgeoisie'].address)).to.be.eq(ethers.utils.parseEther("251.194496025676437751")); // Received 150 ETH minus 0.75 ETH for platform fee
-      expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("0.75"));
+      expect(await ethers.provider.getBalance(TO_IMPERSONATE['cybourgeoisie'].address)).to.be.eq(ethers.utils.parseEther("251.194930482068155645")); // Received 150 ETH minus 0.75 ETH for platform fee
+      expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("0"));
+      expect(await ethers.provider.getBalance(marketFeeAddress)).to.be.eq(ethers.utils.parseEther("0.75"));
       expect((await nftContracts['bayc'].ownerOf(10)).toLowerCase()).to.be.eq(TO_IMPERSONATE['vitalik'].address);
     });
 
 
     it('Make an offer on any Rarible', async function () {
-      expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("0.75"));
+      expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("0"));
       await marketContract.connect(IMPERSONATED['vitalik']).makeOffer(nftContracts['rarible'].address, {value : ethers.utils.parseEther("5.0")});
-      expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("5.75"));
+      expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("5.0"));
     });
 
     it('Expected reverts on takeOffer for Rarible', async function () {
-      expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("5.75"));
+      expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("5.0"));
       await expectRevert(marketContract.connect(IMPERSONATED['cybourgeoisie']).takeOffer(1, 13244), 'Offer does not exist');
       await expectRevert(marketContract.connect(IMPERSONATED['cybourgeoisie']).takeOffer(2, 13244), 'ERC721: transfer caller is not owner nor approved');
 
       // Taker 2 sets approval for contract 1 (which they have no tokens for)
       await nftContracts['rarible'].connect(IMPERSONATED['cybourgeoisie']).setApprovalForAll(marketContract.address, true);
       await expectRevert(marketContract.connect(IMPERSONATED['cybourgeoisie']).takeOffer(2, 13244), 'ERC721: transfer caller is not owner nor approved');
-      expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("5.75"));
+      expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("5.0"));
     });
 
     it('Take an offer on Rarible with Rarible #13244', async function () {
-      expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("5.75"));
-      expect(await ethers.provider.getBalance(TO_IMPERSONATE['dummy'].address)).to.be.eq(ethers.utils.parseEther("99.991905514306312656"));
+      expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("5.0"));
+      expect(await ethers.provider.getBalance(TO_IMPERSONATE['dummy'].address)).to.be.eq(ethers.utils.parseEther("99.992874649053562332"));
       expect(await ethers.provider.getBalance(TO_IMPERSONATE['raribleRoyalty'].address)).to.be.eq(ethers.utils.parseEther("3.889950025493718652"));
       await nftContracts['rarible'].connect(IMPERSONATED['dummy']).approve(marketContract.address, 13244);
       await marketContract.connect(IMPERSONATED['dummy']).takeOffer(2, 13244); // (_offerId, _tokenId)
       expect(await ethers.provider.getBalance(TO_IMPERSONATE['raribleRoyalty'].address)).to.be.eq(ethers.utils.parseEther("4.389950025493718652")); // Received EXACTLY 0.5 more ETH
-      expect(await ethers.provider.getBalance(TO_IMPERSONATE['dummy'].address)).to.be.eq(ethers.utils.parseEther("104.464720915728846797")); // Received 4.5 ETH minus gas + market fee
-      expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("0.775"));
+      expect(await ethers.provider.getBalance(TO_IMPERSONATE['dummy'].address)).to.be.eq(ethers.utils.parseEther("104.465889008468873678")); // Received 4.5 ETH minus gas + market fee
+      expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("0"));
+      expect(await ethers.provider.getBalance(marketFeeAddress)).to.be.eq(ethers.utils.parseEther("0.775"));
       expect((await nftContracts['rarible'].ownerOf(13244)).toLowerCase()).to.be.eq(TO_IMPERSONATE['vitalik'].address);
     });
 
