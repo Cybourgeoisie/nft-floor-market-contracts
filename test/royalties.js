@@ -202,55 +202,6 @@ describe('NFT Floor Market Royalty Payment Tests on Ethereum', function () {
       expect((await nftContracts['rarible'].ownerOf(13244)).toLowerCase()).to.be.eq(TO_IMPERSONATE['vitalik'].address);
     });
 
-/*
-    it('Make another offer on contract #1', async function () {
-      expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("0.006"));
-      await marketContract.connect(makers[1]).makeOffer(nftContracts[1].address, {value : ethers.utils.parseEther("5.3")});
-      expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("5.306"));
-    });
-
-    it('Expected reverts on takeOffer', async function () {
-      expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("5.306"));
-      await expectRevert(marketContract.connect(takers[0]).takeOffer(1, 0), 'Offer does not exist');
-      await expectRevert(marketContract.connect(takers[1]).takeOffer(2, 1), 'ERC721: transfer caller is not owner nor approved');
-
-      // Taker 2 sets approval for contract 1 (which they have no tokens for)
-      await nftContracts[1].connect(takers[2]).setApprovalForAll(marketContract.address, true);
-      await expectRevert(marketContract.connect(takers[2]).takeOffer(2, 1), 'ERC721: transfer caller is not owner nor approved');
-      expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("5.306"));
-    });
-
-    it('Make another offer on contract #1', async function () {
-      expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("5.306"));
-      await marketContract.connect(makers[1]).makeOffer(nftContracts[1].address, {value : ethers.utils.parseEther("6.75")});
-      expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("12.056"));
-    });
-
-    it('Take an offer on contract #1', async function () {
-      expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("12.056"));
-      await nftContracts[1].connect(takers[1]).setApprovalForAll(marketContract.address, true);
-      await marketContract.connect(takers[1]).takeOffer(3, 1); // (_offerId, _tokenId)
-      expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("5.33975"));
-    });
-
-    it('Take the other offer on contract #1', async function () {
-      expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("5.33975"));
-      await marketContract.connect(takers[1]).takeOffer(2, 0); // (_offerId, _tokenId)
-      //await marketContract.connect(owner).withdrawMarketFees();
-      expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("0.06625"));
-    });
-
-    it('Withdraw market fees', async function () {
-      expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("0.06625"));
-      await marketContract.connect(owner).withdrawMarketFees();
-      expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(0);
-
-      // Shouldn't withdraw anything more
-      await marketContract.connect(owner).withdrawMarketFees();
-      expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(0);
-    });
-    */
-
   });
 
 });
