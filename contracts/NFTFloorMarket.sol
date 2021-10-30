@@ -244,7 +244,7 @@ contract NFTFloorMarket is ReentrancyGuard, Ownable {
         // Send the value to the seller
         msg.sender.call{value: sellerValue}('');
 
-        // Keep track of amount market earned
+        // Send the market fee to the market fee address
         MARKET_FEE_ADDRESS.call{value: marketFee}('');
 
         // Announce offer accepted
