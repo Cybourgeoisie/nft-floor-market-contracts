@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "./IRoyaltyEngineV1.sol";
 
 contract NFTFloorMarket is ReentrancyGuard, Ownable {
 
@@ -63,6 +64,10 @@ contract NFTFloorMarket is ReentrancyGuard, Ownable {
     mapping(address => uint128[]) public offersByOfferer;
 
 
+    // Royalty Fee Address
+    address MANIFOLD_ROYALTY_ENGINE;
+
+
     // Market Fees
     uint8   MARKET_FEE_DIVIDEND = 200; // Comes out to 0.5%
     uint256 heldMarketFees = 0;
@@ -70,6 +75,34 @@ contract NFTFloorMarket is ReentrancyGuard, Ownable {
 
     // Anti-Griefing
     uint256 MINIMUM_BUY_ORDER = 10000000000000000; // 0.01 ETH
+
+
+    /**
+     * Royalties
+     **/
+    function setRoyaltyRegistryAddress(address _addr) public onlyOwner {
+        MANIFOLD_ROYALTY_ENGINE = _addr;
+    }
+
+    function getRoyalties(
+        address _contract,
+        uint256 _tokenId,
+        uint256 _value
+    )
+        public
+        view
+        returns (
+            address payable[] memory recipients,
+            uint256[] memory amounts
+        )
+    {
+        if (MANIFOLD_ROYALTY_ENGINE != address(0)) {
+            try IRoyaltyEngineV1(MANIFOLD_ROYALTY_ENGINE).getRoyaltyView(_contract, _tokenId, _value) returns(address payable[] memory _recipients, uint256[] memory _amounts) {
+                return (_recipients, _amounts);
+            } catch {}
+        }
+    }
+
 
     /**
      * Make an offer on any NFT within a contract
@@ -116,8 +149,11 @@ contract NFTFloorMarket is ReentrancyGuard, Ownable {
         // Get the offer
         Offer memory _offer = offers[_offerId];
 
+        /*
+        // Unneeded since second check validates that the offer is legitimate
         // Make sure the offer exists
-        require(_offer._contract != address(0) && _offer._offerer != address(0) && _offer._value != 0, "Offer does not exist");
+        require(_offer._contract != address(0), "Offer does not exist");
+        */
 
         // Make sure that the sender is the owner of the offer ID
         require(_offer._offerer == msg.sender, "Sender does not own offer");
@@ -126,7 +162,7 @@ contract NFTFloorMarket is ReentrancyGuard, Ownable {
         _removeOffer(_offer, _offerId);
 
         // Send the value back to the offerer
-        payable(msg.sender).transfer(_offer._value);
+        msg.sender.call{value: _offer._value}('');
 
         // Announce offer withdrawn
         emit OfferWithdrawn(_offerId, _offer._contract, msg.sender, _offer._value);
@@ -147,7 +183,10 @@ contract NFTFloorMarket is ReentrancyGuard, Ownable {
         Offer memory _offer = offers[_offerId];
 
         // Make sure the offer exists
-        require(_offer._contract != address(0) && _offer._offerer != address(0) && _offer._value != 0, "Offer does not exist");
+        require(_offer._contract != address(0), "Offer does not exist");
+
+        /*
+        // The following two are unnecessary, as transfer fails without it
 
         // Require that the seller owns the token
         require(IERC721(_offer._contract).ownerOf(_tokenId) == msg.sender, "Not owner of token");
@@ -157,19 +196,30 @@ contract NFTFloorMarket is ReentrancyGuard, Ownable {
             IERC721(_offer._contract).isApprovedForAll(msg.sender, address(this)) || IERC721(_offer._contract).getApproved(_tokenId) == address(this),
             "Allowance not granted"
         );
+        */
 
         // Remove the offer
         _removeOffer(_offer, _offerId);
 
         // Transfer NFT to the buyer
-        IERC721(_offer._contract).safeTransferFrom(msg.sender, _offer._offerer, _tokenId);
+        IERC721(_offer._contract).safeTransferFrom(msg.sender, _offer._offerer, _tokenId, "");
+
+        // Retrieve the royalties here
+        uint256 totalRoyaltyFee;
+        (address payable[] memory _recipients, uint256[] memory _amounts) = getRoyalties(_offer._contract, _tokenId, _offer._value);
+        if (_recipients.length > 0 && _amounts.length > 0 && _amounts.length == _recipients.length) {
+            for (uint256 idx; idx < _recipients.length; idx++) {
+                totalRoyaltyFee += _amounts[idx];
+                _recipients[idx].call{value: _amounts[idx]}('');
+            }
+        }
 
         // Split the value among royalties (need to implement EIP here), seller, and market
         uint256 marketFee = _offer._value / MARKET_FEE_DIVIDEND;
-        uint256 sellerValue = _offer._value - marketFee;
+        uint256 sellerValue = _offer._value - marketFee - totalRoyaltyFee;
 
         // Send the value to the seller
-        payable(msg.sender).transfer(sellerValue);
+        msg.sender.call{value: sellerValue}('');
 
         // Keep track of amount market earned
         heldMarketFees += marketFee;
@@ -187,8 +237,9 @@ contract NFTFloorMarket is ReentrancyGuard, Ownable {
         onlyOwner
         nonReentrant
     {
-        payable(owner()).transfer(heldMarketFees);
+        uint256 _heldMarketFees = heldMarketFees;
         heldMarketFees = 0;
+        payable(owner()).transfer(_heldMarketFees);
     }
 
 

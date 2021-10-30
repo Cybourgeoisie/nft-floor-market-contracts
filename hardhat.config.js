@@ -20,10 +20,19 @@ module.exports = {
       }
     }
   },
+  //defaultNetwork: 'localhost',
+  networks: {
+    hardhat: {
+      forking: {
+        url: `https://eth-mainnet.alchemyapi.io/v2/${process.env.ALCHEMY_KEY}`,
+        blockNumber: 13518200,
+      },
+    },
+  },
   etherscan: {
     apiKey: process.env.ETHERSCAN_KEY
   },
   mocha: {
-    timeout: 2000
+    timeout: 10000
   }
 };

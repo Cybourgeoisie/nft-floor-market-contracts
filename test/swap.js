@@ -14,6 +14,11 @@ describe('NFT Floor Market Tests', function () {
   let owner, takers = [], makers = [], getterTestMakers;
 
   before(async () => {
+    await network.provider.request({
+      method: "hardhat_reset",
+      params: [],
+    });
+
     [owner, takers[0], takers[1], takers[2], ...makers] = await ethers.getSigners();
 
     // For later tests
@@ -50,6 +55,7 @@ describe('NFT Floor Market Tests', function () {
 
     const NFTFloorMarket = await ethers.getContractFactory('NFTFloorMarket');
     marketContract = await NFTFloorMarket.deploy();
+    //await marketContract.setRoyaltyRegistryAddress('0xad2184fb5dbcfc05d8f056542fb25b04fa32a95d');
   });
 
 
@@ -74,7 +80,7 @@ describe('NFT Floor Market Tests', function () {
 
     it('Expected reverts on withdrawOffer', async function () {
       expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("1.0"));
-      await expectRevert(marketContract.connect(takers[0]).withdrawOffer(1), 'Offer does not exist');
+      await expectRevert(marketContract.connect(takers[0]).withdrawOffer(1), 'Sender does not own offer');
       await expectRevert(marketContract.connect(takers[0]).withdrawOffer(0), 'Sender does not own offer');
       expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("1.0"));
     });
@@ -107,11 +113,11 @@ describe('NFT Floor Market Tests', function () {
     it('Expected reverts on takeOffer', async function () {
       expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("5.306"));
       await expectRevert(marketContract.connect(takers[0]).takeOffer(1, 0), 'Offer does not exist');
-      await expectRevert(marketContract.connect(takers[1]).takeOffer(2, 1), 'Allowance not granted');
+      await expectRevert(marketContract.connect(takers[1]).takeOffer(2, 1), 'ERC721: transfer caller is not owner nor approved');
 
       // Taker 2 sets approval for contract 1 (which they have no tokens for)
       await nftContracts[1].connect(takers[2]).setApprovalForAll(marketContract.address, true);
-      await expectRevert(marketContract.connect(takers[2]).takeOffer(2, 1), 'Not owner of token');
+      await expectRevert(marketContract.connect(takers[2]).takeOffer(2, 1), 'ERC721: transfer caller is not owner nor approved');
       expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("5.306"));
     });
 
