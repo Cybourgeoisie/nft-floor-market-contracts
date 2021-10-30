@@ -64,13 +64,14 @@ contract NFTFloorMarket is ReentrancyGuard, Ownable {
     mapping(address => uint128[]) public offersByOfferer;
 
 
-    // Royalty Fee Address
-    address public MANIFOLD_ROYALTY_ENGINE;
-
 
     // Market Fees
     uint8   public MARKET_FEE_DIVIDEND = 200; // Comes out to 0.5%
-    address public marketFeeAddress;
+    address public MARKET_FEE_ADDRESS;
+
+
+    // Royalty Fee Address
+    address public MANIFOLD_ROYALTY_ENGINE;
 
 
     // Anti-Griefing
@@ -78,17 +79,17 @@ contract NFTFloorMarket is ReentrancyGuard, Ownable {
 
 
     /**
-     * Royalties - lookup for all royalty addresses
-     **/
-    function setRoyaltyRegistryAddress(address _addr) public onlyOwner {
-        MANIFOLD_ROYALTY_ENGINE = _addr;
-    }
-
-    /**
      * Market Fee Address - all market fees get sent here
      **/
     function setMarketFeeAddress(address _addr) public onlyOwner {
-        marketFeeAddress = _addr;
+        MARKET_FEE_ADDRESS = _addr;
+    }
+
+    /**
+     * Royalties - lookup for all royalty addresses
+     **/
+    function setRoyaltyEngineAddress(address _addr) public onlyOwner {
+        MANIFOLD_ROYALTY_ENGINE = _addr;
     }
 
     /**
@@ -96,6 +97,20 @@ contract NFTFloorMarket is ReentrancyGuard, Ownable {
      **/
     function setMinimumBuyOffer(uint256 _minValue) public onlyOwner {
         MINIMUM_BUY_OFFER = _minValue;
+    }
+
+
+    /**
+     * Constructor
+     **/
+    constructor(
+        address _MARKET_FEE_ADDRESS,
+        address _MANIFOLD_ROYALTY_ENGINE,
+        uint256 _MINIMUM_BUY_OFFER
+    ) {
+        setMarketFeeAddress(_MARKET_FEE_ADDRESS);
+        setRoyaltyEngineAddress(_MANIFOLD_ROYALTY_ENGINE);
+        setMinimumBuyOffer(_MINIMUM_BUY_OFFER);
     }
 
 
@@ -230,7 +245,7 @@ contract NFTFloorMarket is ReentrancyGuard, Ownable {
         msg.sender.call{value: sellerValue}('');
 
         // Keep track of amount market earned
-        marketFeeAddress.call{value: marketFee}('');
+        MARKET_FEE_ADDRESS.call{value: marketFee}('');
 
         // Announce offer accepted
         emit OfferAccepted(_offerId, _offer._contract, _offer._offerer, msg.sender, _tokenId, _offer._value);

@@ -12,6 +12,7 @@ const {
 describe('NFT Floor Market Tests', function () {
   let nftContracts = [], marketContract;
   let owner, takers = [], makers = [], getterTestMakers;
+  let royaltyEngineAddress = '0x0000000000000000000000000000000000000000';
   let marketFeeAddress = '0x85c560610A3c8ACccAD214A6BAaefCdDC81aDDA8';
 
   before(async () => {
@@ -55,9 +56,7 @@ describe('NFT Floor Market Tests', function () {
     await nftContracts[2].connect(owner).mint(takers[2].address, 2);
 
     const NFTFloorMarket = await ethers.getContractFactory('NFTFloorMarket');
-    marketContract = await NFTFloorMarket.deploy();
-    //await marketContract.setRoyaltyRegistryAddress('0xad2184fb5dbcfc05d8f056542fb25b04fa32a95d');
-    await marketContract.setMarketFeeAddress(marketFeeAddress);
+    marketContract = await NFTFloorMarket.deploy(marketFeeAddress, royaltyEngineAddress, ethers.utils.parseEther("0.01"));
   });
 
 
@@ -72,7 +71,7 @@ describe('NFT Floor Market Tests', function () {
     });
 
     it('Default test: Fails to allow non-owner to set royalty lookup or market fee address', async function () {
-      await expectRevert(marketContract.connect(takers[0]).setRoyaltyRegistryAddress(takers[0].address), 'Ownable: caller is not the owner');
+      await expectRevert(marketContract.connect(takers[0]).setRoyaltyEngineAddress(takers[0].address), 'Ownable: caller is not the owner');
       await expectRevert(marketContract.connect(takers[0]).setMarketFeeAddress(takers[0].address), 'Ownable: caller is not the owner');
     });
 

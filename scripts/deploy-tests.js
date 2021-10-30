@@ -7,6 +7,11 @@ const hre = require('hardhat');
 const { ethers } = require('hardhat');
 
 async function main() {
+  await network.provider.request({
+    method: "hardhat_reset",
+    params: [],
+  });
+
   // Check the address of the sender
   const [deployer] = await ethers.getSigners();
 

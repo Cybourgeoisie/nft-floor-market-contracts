@@ -7,7 +7,10 @@
 		"chain": "hardhat node --network hardhat",
 		"fork": "hardhat node --network hardhat",
 		"compile": "hardhat compile",
-		"deploy": "hardhat run ./scripts/deploy.js --network hardhat",
+		"deploy-mumbai": "hardhat run ./scripts/deploy.js --network mumbai",
+		"deploy-polygon": "hardhat run ./scripts/deploy.js --network polygon",
+		"deploy-rinkeby": "hardhat run ./scripts/deploy.js --network rinkeby",
+		"deploy-mainnet": "hardhat run ./scripts/deploy.js --network mainnet",
 		"deploy-tests": "hardhat run ./scripts/deploy-tests.js --network localhost",
 		"test": "hardhat test --network hardhat"
 	},
