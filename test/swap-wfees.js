@@ -9,10 +9,11 @@ const {
   expectRevert, // Assertions for transactions that should fail
 } = require('@openzeppelin/test-helpers');
 
-describe('NFT Floor Market Tests', function () {
+describe('With Market Fees: NFT Floor Market Tests', function () {
   let nftContracts = [], marketContract;
   let owner, takers = [], makers = [], getterTestMakers;
   let royaltyEngineAddress = '0x0000000000000000000000000000000000000000';
+  let marketFeeAddress = '0x85c560610A3c8ACccAD214A6BAaefCdDC81aDDA8';
 
   before(async () => {
     await network.provider.request({
@@ -54,8 +55,8 @@ describe('NFT Floor Market Tests', function () {
     await nftContracts[2].connect(owner).mint(takers[2].address, 1);
     await nftContracts[2].connect(owner).mint(takers[2].address, 2);
 
-    const NFTFloorMarket = await ethers.getContractFactory('NFTFloorMarket');
-    marketContract = await NFTFloorMarket.deploy(royaltyEngineAddress, ethers.utils.parseEther("0.01"));
+    const NFTFloorMarket = await ethers.getContractFactory('NFTFloorMarketWithFees');
+    marketContract = await NFTFloorMarket.deploy(marketFeeAddress, royaltyEngineAddress, ethers.utils.parseEther("0.01"));
   });
 
 
@@ -69,8 +70,9 @@ describe('NFT Floor Market Tests', function () {
       expect(await nftContracts[2].symbol()).to.equal("NGMI");
     });
 
-    it('Default test: Fails to allow non-owner to set royalty lookup address', async function () {
+    it('Default test: Fails to allow non-owner to set royalty lookup or market fee address', async function () {
       await expectRevert(marketContract.connect(takers[0]).setRoyaltyEngineAddress(takers[0].address), 'Ownable: caller is not the owner');
+      await expectRevert(marketContract.connect(takers[0]).setMarketFeeAddress(takers[0].address), 'Ownable: caller is not the owner');
     });
 
     it('Default test: Fails to allow non-owner to set minimum buy offer', async function () {
@@ -117,6 +119,7 @@ describe('NFT Floor Market Tests', function () {
       expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("1.2"));
       await nftContracts[0].connect(takers[0]).approve(marketContract.address, 0);
       await marketContract.connect(takers[0]).takeOffer(1, 0); // (_offerId, _tokenId)
+      expect(await ethers.provider.getBalance(marketFeeAddress)).to.be.eq(ethers.utils.parseEther("0.006"));
       expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("0"));
     });
 
@@ -147,14 +150,34 @@ describe('NFT Floor Market Tests', function () {
       expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("12.05"));
       await nftContracts[1].connect(takers[1]).setApprovalForAll(marketContract.address, true);
       await marketContract.connect(takers[1]).takeOffer(3, 1); // (_offerId, _tokenId)
+      expect(await ethers.provider.getBalance(marketFeeAddress)).to.be.eq(ethers.utils.parseEther("0.03975"));
       expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("5.3"));
     });
 
     it('Take the other offer on contract #1', async function () {
       expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("5.3"));
       await marketContract.connect(takers[1]).takeOffer(2, 0); // (_offerId, _tokenId)
+      //await marketContract.connect(owner).withdrawMarketFees();
+      expect(await ethers.provider.getBalance(marketFeeAddress)).to.be.eq(ethers.utils.parseEther("0.06625"));
       expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("0"));
     });
+
+    /*
+    it('Expected reverts on withdrawMarketFees', async function () {
+      await expectRevert(marketContract.connect(takers[0]).withdrawMarketFees(), 'Ownable: caller is not the owner');
+      await expectRevert(marketContract.connect(makers[0]).withdrawMarketFees(), 'Ownable: caller is not the owner');
+    });
+
+    it('Withdraw market fees', async function () {
+      expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("0"));
+      await marketContract.connect(owner).withdrawMarketFees();
+      expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(0);
+
+      // Shouldn't withdraw anything more
+      await marketContract.connect(owner).withdrawMarketFees();
+      expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(0);
+    });
+    */
 
   });
 
@@ -241,6 +264,7 @@ describe('NFT Floor Market Tests', function () {
       getterTestMakers[5] = getterTestMakers[getterTestMakers.length - 1];
       getterTestMakers.pop();
 
+      expect(await ethers.provider.getBalance(marketFeeAddress)).to.be.eq(ethers.utils.parseEther("0.10375"));
       expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("90.0"));
     });
 
@@ -258,6 +282,7 @@ describe('NFT Floor Market Tests', function () {
       getterTestMakers[9] = getterTestMakers[getterTestMakers.length - 1];
       getterTestMakers.pop();
 
+      expect(await ethers.provider.getBalance(marketFeeAddress)).to.be.eq(ethers.utils.parseEther("0.16625"));
       expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("77.5"));
     });
 
@@ -275,12 +300,25 @@ describe('NFT Floor Market Tests', function () {
       getterTestMakers[1] = getterTestMakers[getterTestMakers.length - 1];
       getterTestMakers.pop();
 
+      expect(await ethers.provider.getBalance(marketFeeAddress)).to.be.eq(ethers.utils.parseEther("0.17875"));
       expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("75.0"));
     });
 
     it('Get offers by contract', reviewOffersByContract);
 
     it('Get offers by offerer', reviewOffersByOfferer.bind(this, true));
+
+    /*
+    it('Withdraw market fees', async function () {
+      expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("75.0"));
+      await marketContract.connect(owner).withdrawMarketFees();
+      expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("75.0"));
+
+      // Shouldn't withdraw anything more
+      await marketContract.connect(owner).withdrawMarketFees();
+      expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("75.0"));
+    });
+    */
 
   });
 

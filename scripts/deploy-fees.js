@@ -31,7 +31,9 @@ async function main() {
   let chainId = (await ethers.provider.getNetwork()).chainId;
 
   // Default Configs
-  let royaltyEngine, minimumBuyOffer;
+  let marketFeeAddress = '0x85c560610A3c8ACccAD214A6BAaefCdDC81aDDA8',
+    royaltyEngine,
+    minimumBuyOffer;
 
   switch (chainId) {
     case 1:
@@ -59,7 +61,7 @@ async function main() {
   const contractFactory = await ethers.getContractFactory('NFTFloorMarket');
 
   // Deploy contract
-  const contract = await contractFactory.deploy(royaltyEngine, minimumBuyOffer);
+  const contract = await contractFactory.deploy(marketFeeAddress, royaltyEngine, minimumBuyOffer);
   await contract.deployed();
 
   console.log('NFT Floor Market contract deployed to:', contract.address);

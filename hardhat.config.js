@@ -38,11 +38,13 @@ module.exports = {
     },
     polygon: {
       url: `https://polygon-mainnet.g.alchemy.com/v2/${process.env.POLYGON_ALCHEMY_KEY}`,
-      accounts: [`0x${process.env.POLYGON_PRIVATE_KEY}`]
+      accounts: [`0x${process.env.POLYGON_PRIVATE_KEY}`],
+      gasPrice: 34500000000
     },
     mainnet: {
       url: `https://eth-mainnet.alchemyapi.io/v2/${process.env.MAINNET_ALCHEMY_KEY}`,
-      accounts: [`0x${process.env.MAINNET_PRIVATE_KEY}`]
+      accounts: [`0x${process.env.MAINNET_PRIVATE_KEY}`],
+      gasPrice: 165000000000
     }
   },
   etherscan: {

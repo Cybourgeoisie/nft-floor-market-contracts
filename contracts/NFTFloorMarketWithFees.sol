@@ -1,5 +1,4 @@
 //SPDX-License-Identifier: Unlicense
-//Written by Cybourgeoisie
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
@@ -7,7 +6,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./IRoyaltyEngineV1.sol";
 
-contract NFTFloorMarket is ReentrancyGuard, Ownable {
+contract NFTFloorMarketWithFees is ReentrancyGuard, Ownable {
 
     // Events
     event OfferPlaced(
@@ -65,6 +64,12 @@ contract NFTFloorMarket is ReentrancyGuard, Ownable {
     mapping(address => uint128[]) public offersByOfferer;
 
 
+
+    // Market Fees
+    uint8   public MARKET_FEE_DIVIDEND = 200; // Comes out to 0.5%
+    address public MARKET_FEE_ADDRESS;
+
+
     // Royalty Fee Address
     address public MANIFOLD_ROYALTY_ENGINE;
 
@@ -72,6 +77,13 @@ contract NFTFloorMarket is ReentrancyGuard, Ownable {
     // Anti-Griefing
     uint256 public MINIMUM_BUY_OFFER = 10000000000000000; // 0.01 ETH
 
+
+    /**
+     * Market Fee Address - all market fees get sent here
+     **/
+    function setMarketFeeAddress(address _addr) public onlyOwner {
+        MARKET_FEE_ADDRESS = _addr;
+    }
 
     /**
      * Royalties - lookup for all royalty addresses
@@ -92,9 +104,11 @@ contract NFTFloorMarket is ReentrancyGuard, Ownable {
      * Constructor
      **/
     constructor(
+        address _MARKET_FEE_ADDRESS,
         address _MANIFOLD_ROYALTY_ENGINE,
         uint256 _MINIMUM_BUY_OFFER
     ) {
+        setMarketFeeAddress(_MARKET_FEE_ADDRESS);
         setRoyaltyEngineAddress(_MANIFOLD_ROYALTY_ENGINE);
         setMinimumBuyOffer(_MINIMUM_BUY_OFFER);
     }
@@ -214,11 +228,24 @@ contract NFTFloorMarket is ReentrancyGuard, Ownable {
             }
         }
 
+        // Get the market fee
+        uint256 marketFee = _offer._value / MARKET_FEE_DIVIDEND;
+
         // Split the value among royalties, seller, and market
-        uint256 sellerValue = _offer._value - totalRoyaltyFee;
+        uint256 sellerValue;
+        if (_offer._value < (marketFee + totalRoyaltyFee)) {
+            // In the exceptionally strange case where value < market fee + royalty fee, leave out the market fee since royalty fees
+            //  need to be less than or equal to provided value (per external contract logic)
+            sellerValue = _offer._value - totalRoyaltyFee;
+        } else {
+            sellerValue = _offer._value - marketFee - totalRoyaltyFee;
+        }
 
         // Send the value to the seller
         msg.sender.call{value: sellerValue}('');
+
+        // Send the market fee to the market fee address
+        MARKET_FEE_ADDRESS.call{value: marketFee}('');
 
         // Announce offer accepted
         emit OfferAccepted(_offerId, _offer._contract, _offer._offerer, msg.sender, _tokenId, _offer._value);

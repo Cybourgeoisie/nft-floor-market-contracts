@@ -39,24 +39,13 @@ const TO_IMPERSONATE = {
 const IMPERSONATED = {};
 
 
-describe('NFT Floor Market Royalty Payment Tests on Ethereum', function () {
+describe('With Market Fees: NFT Floor Market Royalty Payment Tests on Ethereum', function () {
   let marketContract;
   let owner, accts = [];
   let royaltyEngineAddress = '0x0385603ab55642cb4dd5de3ae9e306809991804f';
+  let marketFeeAddress = '0x85c560610A3c8ACccAD214A6BAaefCdDC81aDDA8';
 
   before(async () => {
-    await network.provider.request({
-      method: "hardhat_reset",
-      params: [
-        {
-          forking: {
-            jsonRpcUrl: `https://eth-mainnet.alchemyapi.io/v2/${process.env.MAINNET_ALCHEMY_KEY}`,
-            blockNumber: 13518200,
-          },
-        },
-      ],
-    });
-
     // impersonate accounts holding shells
     for (const identity in TO_IMPERSONATE) {
       await hre.network.provider.request({
@@ -75,8 +64,8 @@ describe('NFT Floor Market Royalty Payment Tests on Ethereum', function () {
 
     [owner, ...accts] = await ethers.getSigners();
 
-    const NFTFloorMarket = await ethers.getContractFactory('NFTFloorMarket');
-    marketContract = await NFTFloorMarket.deploy(royaltyEngineAddress, ethers.utils.parseEther("0.01"));
+    const NFTFloorMarket = await ethers.getContractFactory('NFTFloorMarketWithFees');
+    marketContract = await NFTFloorMarket.deploy(marketFeeAddress, royaltyEngineAddress, ethers.utils.parseEther("0.01"));
   });
 
 
@@ -179,8 +168,9 @@ describe('NFT Floor Market Royalty Payment Tests on Ethereum', function () {
       expect(await ethers.provider.getBalance(TO_IMPERSONATE['cybourgeoisie'].address)).to.be.eq(ethers.utils.parseEther("101.950016835087156937"));
       await nftContracts['bayc'].connect(IMPERSONATED['cybourgeoisie']).approve(marketContract.address, 10);
       await marketContract.connect(IMPERSONATED['cybourgeoisie']).takeOffer(1, 10); // (_offerId, _tokenId)
-      expect(await ethers.provider.getBalance(TO_IMPERSONATE['cybourgeoisie'].address)).to.be.eq(ethers.utils.parseEther("251.944179873630878131")); // Received 150 ETH minus 0.75 ETH for platform fee
+      expect(await ethers.provider.getBalance(TO_IMPERSONATE['cybourgeoisie'].address)).to.be.eq(ethers.utils.parseEther("251.193451326988476090")); // Received 150 ETH minus 0.75 ETH for platform fee
       expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("0"));
+      expect(await ethers.provider.getBalance(marketFeeAddress)).to.be.eq(ethers.utils.parseEther("0.75"));
       expect((await nftContracts['bayc'].ownerOf(10)).toLowerCase()).to.be.eq(TO_IMPERSONATE['vitalik'].address);
     });
 
@@ -204,13 +194,14 @@ describe('NFT Floor Market Royalty Payment Tests on Ethereum', function () {
 
     it('Take an offer on Rarible with Rarible #13244', async function () {
       expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("5.0"));
-      expect(await ethers.provider.getBalance(TO_IMPERSONATE['dummy'].address)).to.be.eq(ethers.utils.parseEther("99.990783084013929696"));
+      expect(await ethers.provider.getBalance(TO_IMPERSONATE['dummy'].address)).to.be.eq(ethers.utils.parseEther("99.990769335256460730"));
       expect(await ethers.provider.getBalance(TO_IMPERSONATE['raribleRoyalty'].address)).to.be.eq(ethers.utils.parseEther("3.889950025493718652"));
       await nftContracts['rarible'].connect(IMPERSONATED['dummy']).approve(marketContract.address, 13244);
       await marketContract.connect(IMPERSONATED['dummy']).takeOffer(2, 13244); // (_offerId, _tokenId)
       expect(await ethers.provider.getBalance(TO_IMPERSONATE['raribleRoyalty'].address)).to.be.eq(ethers.utils.parseEther("4.389950025493718652")); // Received EXACTLY 0.5 more ETH
-      expect(await ethers.provider.getBalance(TO_IMPERSONATE['dummy'].address)).to.be.eq(ethers.utils.parseEther("104.488364005933093707")); // Received 4.5 ETH minus gas + market fee
+      expect(await ethers.provider.getBalance(TO_IMPERSONATE['dummy'].address)).to.be.eq(ethers.utils.parseEther("104.463248402366229692")); // Received 4.5 ETH minus gas + market fee
       expect(await ethers.provider.getBalance(marketContract.address)).to.be.eq(ethers.utils.parseEther("0"));
+      expect(await ethers.provider.getBalance(marketFeeAddress)).to.be.eq(ethers.utils.parseEther("0.775"));
       expect((await nftContracts['rarible'].ownerOf(13244)).toLowerCase()).to.be.eq(TO_IMPERSONATE['vitalik'].address);
     });
 
